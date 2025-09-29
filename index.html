@@ -15,6 +15,14 @@
 <body>
 <script>
 let scene, camera, renderer, controls;
+  const panLimits = {
+  minX: -5,
+  maxX: 5,
+  minY: 0,   // ความสูงของ target
+  maxY: 5,
+  minZ: -5,
+  maxZ: 5
+};
 const pickedOBJ = []
 
 // ---------------- Scene & Renderer ----------------
@@ -40,7 +48,7 @@ function initScene() {
   controls.minDistance = 3;
   controls.maxDistance = 15;
   controls.target.set(0, 3, 0);
-  controls.enablePan = false;
+  // controls.enablePan = false;
 
   // Lights
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
@@ -187,8 +195,13 @@ function createSignboard() {
 
 // ---------------- Animate ----------------
 function animate() {
-  requestAnimationFrame(animate);
+  requestAnimationFrame(animate); 
   controls.update();
+    // จำกัด pan ให้อยู่ในขอบเขต
+  controls.target.x = Math.max(panLimits.minX, Math.min(panLimits.maxX, controls.target.x));
+  controls.target.y = Math.max(panLimits.minY, Math.min(panLimits.maxY, controls.target.y));
+  controls.target.z = Math.max(panLimits.minZ, Math.min(panLimits.maxZ, controls.target.z));
+
   renderer.render(scene, camera);
 }
 

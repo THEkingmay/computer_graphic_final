@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D White Scene</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #ffffff; }
+    canvas { display: block; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+<script>
+let scene, camera, renderer, controls;
+const pickedOBJ = []
+
+// ---------------- Scene & Renderer ----------------
+function initScene() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xffffff);
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(8, 5, 15);
+
+  renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // Controls
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.minPolarAngle = 0.1;
+  controls.maxPolarAngle = Math.PI / 2.1;
+  controls.minDistance = 3;
+  controls.maxDistance = 15;
+  controls.target.set(0, 3, 0);
+  controls.enablePan = false;
+
+  // Lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  dirLight.position.set(5, 10, 5);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.near = 1;
+  dirLight.shadow.camera.far = 30;
+  dirLight.shadow.camera.left = -10;
+  dirLight.shadow.camera.right = 10;
+  dirLight.shadow.camera.top = 10;
+  dirLight.shadow.camera.bottom = -10;
+  scene.add(dirLight);
+
+  window.addEventListener('resize', onWindowResize);
+}
+
+// ---------------- Window Resize ----------------
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ---------------- Floor ----------------
+function createFloor() {
+  const loader = new THREE.TextureLoader();
+  const diffMap = loader.load('https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/rocky_terrain_02_diff_1k.jpg');
+  const normalMap = loader.load('https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/rocky_terrain_02_nor_gl_1k.jpg');
+  const specMap = loader.load('https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/rocky_terrain_02_spec_1k.jpg');
+  const armMap = loader.load('https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/rocky_terrain_02_arm_1k.jpg');
+
+  [diffMap, normalMap, specMap, armMap].forEach(tex => {
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4, 4);
+  });
+
+  const floorGeometry = new THREE.PlaneGeometry(10, 10);
+  floorGeometry.setAttribute('uv2', new THREE.BufferAttribute(floorGeometry.attributes.uv.array, 2));
+  const floorMaterial = new THREE.MeshStandardMaterial({
+    map: diffMap,
+    normalMap: normalMap,
+    aoMap: armMap,
+    roughnessMap: armMap,
+    metalnessMap: armMap,
+    specularMap: specMap
+  });
+
+  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  floor.receiveShadow = true;
+  scene.add(floor);
+}
+
+// ---------------- Load Cafe & Name ----------------
+function loadCafeWithName() {
+  const loader = new THREE.GLTFLoader();
+  loader.load(
+    'https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/low-poly_cafe.glb',
+    function(gltf) {
+      const cafe = gltf.scene;
+      cafe.position.set(-2, 0, -1);
+      cafe.scale.set(0.01, 0.01, 0.01);
+
+      cafe.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      scene.add(cafe);
+
+      // โหลดตัวอักษรชื่อและวางบนหลังคา
+      loader.load(
+        'https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/name.glb',
+        (gltf) => {
+          const name = gltf.scene;
+          name.position.set(
+            cafe.position.x +0.2,
+            cafe.position.y + 6.8,
+            cafe.position.z - 2
+          );
+          name.rotation.y = -Math.PI / 2;
+          name.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+          scene.add(name);
+        },
+        undefined,
+        (error) => console.error(error)
+      );
+    },
+    undefined,
+    (error) => console.error(error)
+  );
+}
+
+// ---------------- Create Signboard ----------------
+function createSignboard() {
+  const signGroup = new THREE.Group();
+
+  // ป้ายรูปตัวเอง
+  const myTexture = new THREE.TextureLoader().load('https://raw.githubusercontent.com/THEkingmay/computer_graphic_final/main/me.png');
+  myTexture.wrapS = THREE.ClampToEdgeWrapping;
+  myTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+  const signGeometry = new THREE.BoxGeometry(2, 3, 0.1);
+  const signMaterial = new THREE.MeshStandardMaterial({ map: myTexture, metalness: 0.3, roughness: 0.7 });
+  const signBoard = new THREE.Mesh(signGeometry, signMaterial);
+  signBoard.position.set(0, 2, 0);
+  signBoard.castShadow = true;
+  signBoard.receiveShadow = true;
+  signGroup.add(signBoard);
+
+  // ขาตั้งซ้าย
+  const legGeometry = new THREE.BoxGeometry(0.1, 1.5, 0.1);
+  const legMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.2, roughness: 0.8 });
+  const legLeft = new THREE.Mesh(legGeometry, legMaterial);
+  legLeft.position.set(-0.7, 0.3, -0.05);
+  legLeft.castShadow = true;
+  legLeft.receiveShadow = true;
+  signGroup.add(legLeft);
+
+  // ขาตั้งขวา
+  const legRight = new THREE.Mesh(legGeometry, legMaterial);
+  legRight.position.set(0.7, 0.3, -0.05);
+  legRight.castShadow = true;
+  legRight.receiveShadow = true;
+  signGroup.add(legRight);
+
+  signGroup.position.set(2.5, 0.4, -1);
+  signGroup.rotation.y = -Math.PI / 12;
+  scene.add(signGroup);
+}
+
+// ---------------- Animate ----------------
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ---------------- Main ----------------
+function main() {
+  initScene();
+  createFloor();
+  loadCafeWithName();
+  createSignboard();
+  animate();
+}
+
+main();
+</script>
+</body>
+</html>

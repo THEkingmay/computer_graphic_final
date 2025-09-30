@@ -21,7 +21,6 @@ let moveToPosition = {
   camera: new THREE.Vector3(0, -3, 15),
   target: new THREE.Vector3(0, 0, 0)
 };
-let cameraMoving = true;
 
 let clickableObj = [];
 let cameraPosition = new THREE.Vector3(10, 20, 24);
@@ -161,7 +160,7 @@ window.addEventListener('resize', handleResize);
 
 // ------------------ Update Camera ------------------
 function updateCamera() {
-    if (!cameraMoving || !moveToPosition) return;
+    if (!moveToPosition) return;
 
     camera.position.lerp(moveToPosition.camera, 0.05);
     controls.target.lerp(moveToPosition.target, 0.05);
@@ -172,7 +171,7 @@ function updateCamera() {
         camera.position.copy(moveToPosition.camera);
         controls.target.copy(moveToPosition.target);
         moveToPosition = null;
-        cameraMoving = false;
+        
     }
 }
 

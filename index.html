@@ -21,6 +21,9 @@ let moveToPosition = {
   camera: new THREE.Vector3(0, -3, 15),
   target: new THREE.Vector3(0, 0, 0)
 };
+// ------------------ Raycaster ------------------
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
 
 let clickableObj = [];
 let cameraPosition = new THREE.Vector3(10, 20, 24);
@@ -45,43 +48,98 @@ function createRenderer() {
     document.body.appendChild(renderer.domElement);
 }
 
-// ------------------ Light ------------------
-function createLight() {
-    const spot = new THREE.SpotLight(0xffffff, 1);
-    spot.position.set(0, 0, 20);
-    spot.angle = Math.PI / 6;
-    spot.penumbra = 0.5;
-    spot.decay = 2;
-    spot.distance = 50;
-    spot.castShadow = true;
-    spot.shadow.mapSize.width = 2048;
-    spot.shadow.mapSize.height = 2048;
-    spot.shadow.bias = -0.0005;
-    scene.add(spot);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 0.2);
-    scene.add(ambient);
-}
 
 // ------------------ Controls ------------------
 function createControls() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.minPolarAngle = Math.PI / 10;        
-    controls.maxPolarAngle = Math.PI / 1.10;
-    controls.minAzimuthAngle = -Math.PI / 3;
-    controls.maxAzimuthAngle = Math.PI / 3;
+    // controls.minPolarAngle = Math.PI / 10;        
+    // controls.maxPolarAngle = Math.PI / 1.10;
+    // controls.minAzimuthAngle = -Infinity;
+    // controls.maxAzimuthAngle = Infinity;
     controls.enableDamping = true;
     controls.enableZoom = false;
     controls.enablePan = false;
 }
 
-// ------------------ Text ------------------
-function createText() {
-    const loader = new THREE.FontLoader();
 
-    // "Welcome to my portfolio"
-    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', font => {
-        const textGeo = new THREE.TextGeometry("Welcome to my portfolio", {
+function createRoom(size, zPos, color) {
+  const roomGeo = new THREE.BoxGeometry(size , size , size);
+  const roomMat = new THREE.MeshStandardMaterial({ 
+    color: color,
+    side: THREE.BackSide // กล้องอยู่ข้างในกล่อง
+  });
+  const room = new THREE.Mesh(roomGeo, roomMat);
+  room.receiveShadow = true;
+  room.castShadow = true
+  room.position.z = zPos;
+  scene.add(room);
+}
+
+// ------------------ Resize ------------------
+function handleResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ------------------ Update Camera ------------------
+function updateCamera() {
+    // if(!moveToPosition) return
+    camera.position.lerp(moveToPosition.camera, 0.02);
+    controls.target.lerp(moveToPosition.target, 0.02);
+    // console.log(moveToPosition , camera.position)
+    // if (camera.position.distanceTo(moveToPosition.camera) < 2) {
+    //   camera.position.copy(moveToPosition.camera);
+    //    if (controls.target.distanceTo(moveToPosition.target) < 2) {
+    //     controls.target.copy(moveToPosition.target);
+    //     moveToPosition = null
+    //    } 
+    // }
+    controls.update();
+}
+
+function setPointer(e) {
+    const r = renderer.domElement.getBoundingClientRect();
+    const x = (e.clientX ?? e.touches[0].clientX) - r.left;
+    const y = (e.clientY ?? e.touches[0].clientY) - r.top;
+    pointer.x = (x / r.width) * 2 - 1;
+    pointer.y = -(y / r.height) * 2 + 1;
+}
+
+function onPick(e) {
+    setPointer(e);
+    // console.log('test')
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects(clickableObj, true)[0]; // true รวม child
+    if (!hit) return;
+    // console.log(hit)
+    if (hit.object.name === "getStarted") {
+      
+        // console.log("hit")
+        // กำหนดกล้องไปข้างหลังและสูงขึ้นจาก target
+        moveToPosition = {
+            camera: new THREE.Vector3(0, 0, -40),
+            target: new THREE.Vector3(0, 0 , -40)
+        };
+    }
+}
+
+// ------------------ Animate ------------------
+function animate(t) {
+    requestAnimationFrame(animate);
+    updateCamera();
+    controls.update();
+
+
+
+    renderer.render(scene, camera);
+}
+
+function Room1(){
+  createRoom(40,0, 0xdddddd); 
+  const loader = new THREE.FontLoader();
+  loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', font => {
+        const textGeo = new THREE.TextGeometry("Hi , Welcome to my site", {
             font: font,
             size: 1,
             height: 0.2,
@@ -94,8 +152,6 @@ function createText() {
         textMesh.castShadow = true;
         scene.add(textMesh);
     });
-
-    // "Get Started >" (Clickable)
     loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', font => {
         const startGeo = new THREE.TextGeometry("Get Started >", {
             font: font,
@@ -112,118 +168,36 @@ function createText() {
         clickableObj.push(startMesh);
         scene.add(startMesh);
     });
+const roomLight = new THREE.SpotLight(0xffffff, 1, 30); // intensity ลดจาก 1.5 → 0.5
+roomLight.position.set(0, 0,15);
+roomLight.castShadow = true;
+roomLight.distance = 45; // ลดระยะให้แสงไม่ไกลเกิน
+roomLight.angle = Math.PI / 6; // กำหนดมุมกรวยแสง ถ้าต้องการ
+roomLight.penumbra = 0.3;    // ลดขอบแสงให้ดูนุ่ม
+roomLight.shadow.mapSize.width = 1024;
+roomLight.shadow.mapSize.height = 1024;
+
+scene.add(roomLight);
+//     const spotHelper = new THREE.SpotLightHelper(roomLight, 0xffff00); // สีเหลือง
+// scene.add(spotHelper);
 }
-
-// ------------------ Plane ------------------
-function createPlane() {
-    const mat = new THREE.MeshStandardMaterial({ color: 0x363636 });
-
-    const frontGeo = new THREE.PlaneGeometry(40, 40);
-
-    const frontPlane = new THREE.Mesh(frontGeo, mat);
-    frontPlane.position.z = -5;
-    frontPlane.receiveShadow = true;
-    scene.add(frontPlane);
-
-    const leftPlane = new THREE.Mesh(frontGeo, mat);
-    leftPlane.position.x = -20;
-    leftPlane.rotation.y = Math.PI / 2;
-    leftPlane.receiveShadow = true;
-    scene.add(leftPlane);
-
-    const rightPlane = new THREE.Mesh(frontGeo, mat);
-    rightPlane.position.x = 20;
-    rightPlane.rotation.y = -Math.PI / 2;
-    rightPlane.receiveShadow = true;
-    scene.add(rightPlane);
-
-    const bottomPlane = new THREE.Mesh(frontGeo, mat);
-    bottomPlane.position.y = -20;
-    bottomPlane.rotation.x = -Math.PI / 2;
-    bottomPlane.receiveShadow = true;
-    scene.add(bottomPlane);
-
-    const topPlane = new THREE.Mesh(frontGeo, mat);
-    topPlane.position.y = 20;
-    topPlane.rotation.x = Math.PI / 2;
-    topPlane.receiveShadow = true;
-    scene.add(topPlane);
-}
-
-// ------------------ Resize ------------------
-function handleResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-window.addEventListener('resize', handleResize);
-
-// ------------------ Update Camera ------------------
-function updateCamera() {
-    if (!moveToPosition) return;
-
-    camera.position.lerp(moveToPosition.camera, 0.05);
-    controls.target.lerp(moveToPosition.target, 0.05);
-    controls.update();
-
-    if (camera.position.distanceTo(moveToPosition.camera) < 0.01 &&
-        controls.target.distanceTo(moveToPosition.target) < 0.01) {
-        camera.position.copy(moveToPosition.camera);
-        controls.target.copy(moveToPosition.target);
-        moveToPosition = null;
-        
-    }
-}
-
-// ------------------ Raycaster ------------------
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-
-function setPointer(e) {
-    const r = renderer.domElement.getBoundingClientRect();
-    const x = (e.clientX ?? e.touches[0].clientX) - r.left;
-    const y = (e.clientY ?? e.touches[0].clientY) - r.top;
-    pointer.x = (x / r.width) * 2 - 1;
-    pointer.y = -(y / r.height) * 2 + 1;
-}
-
-function onPick(e) {
-    setPointer(e);
-    raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(clickableObj, true)[0]; // true รวม child
-    if (!hit) return;
-
-    if (hit.object.name === "getStarted") {
-        cameraMoving = true;
-        // กำหนดกล้องไปข้างหลังและสูงขึ้นจาก target
-        moveToPosition = {
-            camera: new THREE.Vector3(10, 10, 30),
-            target: new THREE.Vector3(0, 0, 0)
-        };
-    }
-}
-
-renderer?.domElement.addEventListener('click', onPick);
-renderer?.domElement.addEventListener('touchend', (e) => { onPick(e); });
-
-// ------------------ Animate ------------------
-function animate() {
-    requestAnimationFrame(animate);
-    updateCamera();
-    controls.update();
-    renderer.render(scene, camera);
-}
-
+function Room2(){
+    createRoom(3,-40, 0x444444); 
+    const roomLight = new THREE.PointLight(0xffffff, 1.5, 30); // intensity ลดจาก 1.5 → 0.5
+    roomLight.position.set(0,0.5,-40)
+    scene.add(roomLight)
+} 
 // ------------------ Main ------------------
 function main() {
     createScene();
     createCamera();
     createRenderer();
-    createLight();
     createControls();
-    createPlane();
-    createText();
-
+    Room1()
+    Room2()
+    renderer?.domElement.addEventListener('click', onPick);
+    renderer?.domElement.addEventListener('touchend', (e) => { onPick(e); });
+    window.addEventListener('resize', handleResize);
     animate();
 }
 
